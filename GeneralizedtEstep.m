@@ -2,7 +2,6 @@ function HMModel = GeneralizedtEstep(ySeq, HMModel)
 HMModel.EM = rmfield(HMModel.EM, {'Etau'});
 nSeq = HMModel.nSeq;
 K = HMModel.StateParameters.K;
-p = HMModel.ARorder;
 iIni = HMModel.ARorder + 1;
 for iSeq = 1:nSeq
     N = HMModel.N(iSeq);
@@ -23,11 +22,7 @@ for iSeq = 1:nSeq
                 HMModel.ObsParameters.sigma(k)^2;
             wnk(k, :) = (nuk + 1)./(nuk + deltk);
         end
-    end
-    
-    
+    end  
     HMModel.EM(iSeq).Etau = single(wnk);
 end
-
-
 end

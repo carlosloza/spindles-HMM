@@ -1,7 +1,5 @@
 function [CM, CMevent] = ConfusionMatrixSpindles(labelsGT, labelsPred, Fs)
 % always assume labels = 1 means no spindle and labels = 2 means spindle
-%figure, subplot(2,1,1), plot(labelsGT), ylim([-0.5 2.5])
-%subplot(2,1,2), plot(labelsPred), ylim([-0.5 2.5])
 
 %% Confussion matrix based on time samples
 CM = zeros(2, 2);
