@@ -1,6 +1,3 @@
-clearvars
-close all
-clc
 %% Unsupervised setting, i.e. Learning
 % Use logsumexp implementation because of artifacts!
 % Methodology:
@@ -20,11 +17,15 @@ clc
 % This function takes so long that it needs to be ran in a
 % subject-by-subject basis
 
-addpath('../../HMM')
-poolObj = gcp('nocreate');
-if isempty(poolObj)
-    parpool(12)
-end
+clearvars
+close all
+clc
+
+%addpath('../../HMM')
+% poolObj = gcp('nocreate');
+% if isempty(poolObj)
+%     parpool(12)
+% end
 
 Fs = 50;
 nSubTotal = 8;
@@ -32,8 +33,7 @@ K = 2;
 normflag = 1;
 Estep = 'logsumexp';
 
-%ObsModel = 'Generalizedt';
-ObsModel = 'Gaussian';
+ObsModel = 'Generalizedt';
 dmaxSec = 30;
 p = 5;
 dmin = p + 1;
@@ -50,8 +50,7 @@ labelsGT = cell(1, nSubTotal);
 for i = 1:nSubTotal
     load(['Data/Subject' num2str(i) '_Fs' num2str(100) '.mat'])
     ySeq{i} = y;
-    labelsGT{i} = labels;
-    
+    labelsGT{i} = labels;    
     ySeq{i} = downsample(ySeq{i}, 2);
     labelsGT{i} = downsample(labelsGT{i}, 2);
 end
@@ -73,20 +72,10 @@ for subj_i = 1:nSubTotal
     trainSet = setdiff(1:nSubTotal, testSet);
     fprintf('Test Subject %d, p = %d \n', testSet, p)
     
-%     HMModel = HMModelIni;
-%     for k = 1:numel(trainSet)
-%         TrainingStructure(k).y = ySeq{trainSet(k)};
-%         TrainingStructure(k).z = labelsGT{trainSet(k)};
-%     end
-%     HMModel = HMMLearningCompleteDataSleepSpindles(TrainingStructure, HMModel);
-    
-    % Initial Gaussian model
     yTrainSet = cell(1, numel(trainSet));
     for k = 1:numel(trainSet)
         yTrainSet{k} = ySeq{trainSet(k)};
     end
-    % Learn Gaussian model parameters via EM - NOTE: no observation
-    % parameter input so the default will be Gaussian
     HMModel = HMMLearning(yTrainSet, K, 'type', HMModelIni.type,...
         'ARorder', p, 'Estep', Estep, 'normalize', normflag,...
         'ObsParameters', HMModelIni.ObsParameters,...

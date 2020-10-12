@@ -51,7 +51,4 @@ end
 TNevent = length(labelsGT)/Fs - FPevent - TPevent - FNevent;
 CMevent(2,1) = FPevent;
 CMevent(2,2) = TNevent;
-
-%% FPprop
-%FPprop = FPevent/(TPevent + FNevent);
 end
