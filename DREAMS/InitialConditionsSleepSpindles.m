@@ -65,21 +65,9 @@ end
 
 %% Transition matrices for all cases
 if ~isfield(HMModel.StateParameters, 'A')
-    switch HMModel.type
-        case 'ARHMM'
-            A = [0.9 0.1; 0.1 0.9];
-        case 'ARHSMMED'
-            % TO - DO
-            %A = [0.9 0.1; 1 0];
-            A = [0.5 0.5; 1 0];
-        case 'ARHSMMVT'
-            % Do nothing - pass this as a parameter
-%             dmin = HMModel.DurationParameters.dmin;
-%             dmax = HMModel.DurationParameters.dmax;
-%             distInt = HMModel.DurationParameters.DurationIntervals;
-%             distIntaux = distInt;
-%             distIntaux(end) = dmax + 1;
-    end
+    A = [0.5 0.5; 1 0];
+    HMModel.StateParameters.A(:, :, 1) = A;
+    HMModel.StateParameters.A(:, :, 2) = eye(K);
 %     % Transition matrix - encourage persistent states
 %     A = 0.8*eye(K);
 %     for i = 1:K
@@ -87,89 +75,81 @@ if ~isfield(HMModel.StateParameters, 'A')
 %         aux = (1 - A(i,i))*aux./sum(aux);
 %         A(i, 1:K ~= i) = aux;
 %     end
-    if strcmpi(HMModel.type, 'HMM') || strcmpi(HMModel.type, 'ARHMM')
-        HMModel.StateParameters.A = A;
-    elseif strcmpi(HMModel.type, 'HSMMED') || strcmpi(HMModel.type, 'ARHSMMED')
-        HMModel.StateParameters.A(:, :, 1) = A;
-        HMModel.StateParameters.A(:, :, 2) = eye(K);
-    end
+%     if strcmpi(HMModel.type, 'HMM') || strcmpi(HMModel.type, 'ARHMM')
+%         HMModel.StateParameters.A = A;
+%     elseif strcmpi(HMModel.type, 'HSMMED') || strcmpi(HMModel.type, 'ARHSMMED')
+%         HMModel.StateParameters.A(:, :, 1) = A;
+%         HMModel.StateParameters.A(:, :, 2) = eye(K);
+%     end
 end
 
 %% Duration parameters for HSMMED and ARHSMMED
-if strcmpi(HMModel.type, 'HSMMED') || strcmpi(HMModel.type, 'ARHSMMED') || strcmpi(HMModel.type, 'ARHSMMVT')
-    if ~isfield(HMModel.DurationParameters, 'dmin')
-        % First check if model is autoregressive
-        if strcmpi(HMModel.type, 'ARHSMMED') || strcmpi(HMModel.type, 'ARHSMMVT')
-            HMModel.DurationParameters.dmin = HMModel.ARorder + 1;
-        else
-            % Heuristic - might be painfully slow and biased!
-            HMModel.DurationParameters.dmin = 1;
-        end      
-    else
-        if strcmpi(HMModel.type, 'ARHSMMED') || strcmpi(HMModel.type, 'ARHSMMVT')
-            if HMModel.DurationParameters.dmin <= HMModel.ARorder
-                warning('Minimum duration in ARHSM models must be larger than AR order. Setting proper value')
-                HMModel.DurationParameters.dmin = HMModel.ARorder + 1;
-            end
-        end
-        
+if ~isfield(HMModel.DurationParameters, 'dmin')
+    % First check if model is autoregressive
+    HMModel.DurationParameters.dmin = HMModel.ARorder + 1;
+else
+    
+    if HMModel.DurationParameters.dmin <= HMModel.ARorder
+        warning('Minimum duration in ARHSM models must be larger than AR order. Setting proper value')
+        HMModel.DurationParameters.dmin = HMModel.ARorder + 1;
     end
-    if ~isfield(HMModel.DurationParameters, 'dmax')
-        % Heuristic - might be painfully slow!
-        HMModel.DurationParameters.dmax = round(mean(horzcat(HMModel.N))/K);
-    end
-    dmax = HMModel.DurationParameters.dmax;
-    dmin = HMModel.DurationParameters.dmin;
-    HMModel.DurationParameters.flag = 1;
-    if strcmpi(HMModel.DurationParameters.model, 'NonParametric')
-        if ~isfield(HMModel.DurationParameters, 'PNonParametric')
-            for k = 1:K
-                if k == 1
-                    f = ones(1, dmax - dmin + 1); 
-                    %f = exp((dmax/HMModel.Fs)*(dmin:dmax)/(dmax-dmin));
-                    f = f/sum(f);
-                    HMModel.DurationParameters.PNonParametric(k, :) = [zeros(1, dmin-1) f];
+    
+end
+if ~isfield(HMModel.DurationParameters, 'dmax')
+    % Heuristic - might be painfully slow!
+    HMModel.DurationParameters.dmax = round(mean(horzcat(HMModel.N))/K);
+end
+dmax = HMModel.DurationParameters.dmax;
+dmin = HMModel.DurationParameters.dmin;
+HMModel.DurationParameters.flag = 1;
+if strcmpi(HMModel.DurationParameters.model, 'NonParametric')
+    if ~isfield(HMModel.DurationParameters, 'PNonParametric')
+        for k = 1:K
+            if k == 1
+                f = ones(1, dmax - dmin + 1);
+                %f = exp((dmax/HMModel.Fs)*(dmin:dmax)/(dmax-dmin));
+                f = f/sum(f);
+                HMModel.DurationParameters.PNonParametric(k, :) = [zeros(1, dmin-1) f];
+            else
+                if isfield(HMModel.DurationParameters, 'Ini')
+                    f1 = [zeros(1, 24) normpdf(25:dmax, HMModel.DurationParameters.Ini(1), HMModel.DurationParameters.Ini(2))];
                 else
-                    if isfield(HMModel.DurationParameters, 'Ini')
-                        f1 = [zeros(1, 24) normpdf(25:dmax, HMModel.DurationParameters.Ini(1), HMModel.DurationParameters.Ini(2))];
-                    else
-                        f1 = [zeros(1, 24) normpdf(25:dmax, 50, 5)];
-                    end
-                    f1 = f1/sum(f1);
-                    f = [f1 zeros(1, dmax - numel(f1))];                  
-                    HMModel.DurationParameters.PNonParametric(k, :) = f;
-                end              
-                clear f
-            end
-            HMModel.DurationParameters.flag = 0;
-        end
-    else
-        switch HMModel.DurationParameters.model
-            case 'Poisson'
-                if ~isfield(HMModel.DurationParameters, 'lambda')
-                    aux = [zeros(1, dmin-1) ones(1, dmax - dmin + 1)];
-                    aux = aux/sum(aux);
-                    HMModel.DurationParameters.PNonParametric = repmat(aux, K, 1);
-                    % Auxiliary flag
-                    HMModel.DurationParameters.flag = 1;
-                else
-                    HMModel.DurationParameters.flag = 0;
+                    f1 = [zeros(1, 24) normpdf(25:dmax, 50, 5)];
                 end
-            case  'Gaussian'
-                if ~isfield(HMModel.DurationParameters, 'mu')
-                    aux = [zeros(1, dmin-1) ones(1, dmax - dmin + 1)];
-                    aux = aux/sum(aux);
-                    HMModel.DurationParameters.PNonParametric = repmat(aux, K, 1);
-                    % Auxiliary flag
-                    HMModel.DurationParameters.flag = 1;
-                else
-                    HMModel.DurationParameters.flag = 0;
-                end
+                f1 = f1/sum(f1);
+                f = [f1 zeros(1, dmax - numel(f1))];
+                HMModel.DurationParameters.PNonParametric(k, :) = f;
+            end
+            clear f
         end
+        HMModel.DurationParameters.flag = 0;
     end
-    % Pre-compute factorials for Poisson model
-    if strcmpi(HMModel.DurationParameters.model, 'Poisson')
-        HMModel.DurationParameters.dlogfact = log(factorial(1:dmax));
+else
+    switch HMModel.DurationParameters.model
+        case 'Poisson'
+            if ~isfield(HMModel.DurationParameters, 'lambda')
+                aux = [zeros(1, dmin-1) ones(1, dmax - dmin + 1)];
+                aux = aux/sum(aux);
+                HMModel.DurationParameters.PNonParametric = repmat(aux, K, 1);
+                % Auxiliary flag
+                HMModel.DurationParameters.flag = 1;
+            else
+                HMModel.DurationParameters.flag = 0;
+            end
+        case  'Gaussian'
+            if ~isfield(HMModel.DurationParameters, 'mu')
+                aux = [zeros(1, dmin-1) ones(1, dmax - dmin + 1)];
+                aux = aux/sum(aux);
+                HMModel.DurationParameters.PNonParametric = repmat(aux, K, 1);
+                % Auxiliary flag
+                HMModel.DurationParameters.flag = 1;
+            else
+                HMModel.DurationParameters.flag = 0;
+            end
     end
+end
+% Pre-compute factorials for Poisson model
+if strcmpi(HMModel.DurationParameters.model, 'Poisson')
+    HMModel.DurationParameters.dlogfact = log(factorial(1:dmax));
 end
 end

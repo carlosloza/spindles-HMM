@@ -34,7 +34,7 @@ normflag = 1;
 Estep = 'logsumexp';
 
 ObsModel = 'Generalizedt';
-dmaxSec = 30;
+dmaxSec = 3;
 p = 5;
 dmin = p + 1;
 dmax = round(dmaxSec*Fs);
@@ -76,11 +76,11 @@ for subj_i = 1:nSubTotal
     for k = 1:numel(trainSet)
         yTrainSet{k} = ySeq{trainSet(k)};
     end
-    HMModel = HMMLearning(yTrainSet, K, 'type', HMModelIni.type,...
-        'ARorder', p, 'Estep', Estep, 'normalize', normflag,...
+    HMModel = HMMLearning(yTrainSet, K,...
+        'ARorder', p, 'normalize', normflag,...
         'ObsParameters', HMModelIni.ObsParameters,...
         'DurationParameters', HMModelIni.DurationParameters,...
-        'robustMstep', false, 'Fs', Fs, 'SleepSpindles', true);
+        'robustIni', true, 'Fs', Fs);
 %     % Inference, i.e. segmentation via Viterbi
 %     labelsTrainNormal = cell(1, numel(trainSet));
 %     for k = 1:numel(trainSet)
