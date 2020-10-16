@@ -145,11 +145,7 @@ else
     
 end
 
-%%
-%HMModel.DurationParameters.dmax = dmax;
-%HMModel.DurationParameters.dmin = dmin;
 HMModel.DurationParameters.flag = 0;
-
 HMModel.StateParameters.A(:, :, 1) = A;
 HMModel.StateParameters.A(:,:,2) = eye(K);
 

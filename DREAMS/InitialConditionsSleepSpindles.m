@@ -30,11 +30,13 @@ if ~isfield(HMModel.ObsParameters, 'meanParameters')
         aSeq = [];
         % Initial observation noise under linear model
         %aini = (Ypini'*Ypini)\(Ypini'*Yini);
-        mdl = fitlm(Ypini, Yini, 'Intercept', false, 'RobustOpts', 'welsch');
-        aini = table2array(mdl.Coefficients(:,1));
-        
+        if HMModel.robustIni
+            mdl = fitlm(Ypini, Yini, 'Intercept', false, 'RobustOpts', 'welsch');
+        else
+            mdl = fitlm(Ypini, Yini, 'Intercept', false);
+        end       
+        aini = table2array(mdl.Coefficients(:,1));      
         sig = ones(1, K)*std(Ypini*aini - Yini, 1);
-        % No more Kalman
         a1 = [1; aini]';
         b1 = [zeros(1, p-1) 1];
         [z1, p1, k1] = tf2zp(b1, a1);
@@ -68,19 +70,6 @@ if ~isfield(HMModel.StateParameters, 'A')
     A = [0.5 0.5; 1 0];
     HMModel.StateParameters.A(:, :, 1) = A;
     HMModel.StateParameters.A(:, :, 2) = eye(K);
-%     % Transition matrix - encourage persistent states
-%     A = 0.8*eye(K);
-%     for i = 1:K
-%         aux = gamrnd(1, 1, 1, K - 1);   % Sample from dirichlet distribution
-%         aux = (1 - A(i,i))*aux./sum(aux);
-%         A(i, 1:K ~= i) = aux;
-%     end
-%     if strcmpi(HMModel.type, 'HMM') || strcmpi(HMModel.type, 'ARHMM')
-%         HMModel.StateParameters.A = A;
-%     elseif strcmpi(HMModel.type, 'HSMMED') || strcmpi(HMModel.type, 'ARHSMMED')
-%         HMModel.StateParameters.A(:, :, 1) = A;
-%         HMModel.StateParameters.A(:, :, 2) = eye(K);
-%     end
 end
 
 %% Duration parameters for HSMMED and ARHSMMED
@@ -107,7 +96,6 @@ if strcmpi(HMModel.DurationParameters.model, 'NonParametric')
         for k = 1:K
             if k == 1
                 f = ones(1, dmax - dmin + 1);
-                %f = exp((dmax/HMModel.Fs)*(dmin:dmax)/(dmax-dmin));
                 f = f/sum(f);
                 HMModel.DurationParameters.PNonParametric(k, :) = [zeros(1, dmin-1) f];
             else
@@ -124,32 +112,5 @@ if strcmpi(HMModel.DurationParameters.model, 'NonParametric')
         end
         HMModel.DurationParameters.flag = 0;
     end
-else
-    switch HMModel.DurationParameters.model
-        case 'Poisson'
-            if ~isfield(HMModel.DurationParameters, 'lambda')
-                aux = [zeros(1, dmin-1) ones(1, dmax - dmin + 1)];
-                aux = aux/sum(aux);
-                HMModel.DurationParameters.PNonParametric = repmat(aux, K, 1);
-                % Auxiliary flag
-                HMModel.DurationParameters.flag = 1;
-            else
-                HMModel.DurationParameters.flag = 0;
-            end
-        case  'Gaussian'
-            if ~isfield(HMModel.DurationParameters, 'mu')
-                aux = [zeros(1, dmin-1) ones(1, dmax - dmin + 1)];
-                aux = aux/sum(aux);
-                HMModel.DurationParameters.PNonParametric = repmat(aux, K, 1);
-                % Auxiliary flag
-                HMModel.DurationParameters.flag = 1;
-            else
-                HMModel.DurationParameters.flag = 0;
-            end
-    end
-end
-% Pre-compute factorials for Poisson model
-if strcmpi(HMModel.DurationParameters.model, 'Poisson')
-    HMModel.DurationParameters.dlogfact = log(factorial(1:dmax));
 end
 end

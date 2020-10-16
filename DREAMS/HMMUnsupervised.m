@@ -1,6 +1,3 @@
-clearvars
-close all
-clc
 %% Unsupervised setting, i.e. Learning
 % Use logsumexp implementation because of artifacts!
 % Methodology:
@@ -20,128 +17,89 @@ clc
 % This function takes so long that it needs to be ran in a
 % subject-by-subject basis
 
+clearvars
+close all
+clc
+
 Fs = 50;
 nSubTotal = 8;
 K = 2;
 normflag = 1;
-Estep = 'logsumexp';
 
-ObsModel = 'Generalizedt';
-%ObsModel = 'Gaussian';
-dmaxSec = 5;
+dmaxSec = 2;
 p = 5;
 dmin = p + 1;
 dmax = round(dmaxSec*Fs);
-robustMstepflag = true;            
+robustIni = true;            
 
 PerfTest = zeros(3, nSubTotal);
 PerfTestAlt = zeros(3, nSubTotal);
 NLLTest = zeros(1, nSubTotal);
 HMModelSupervised = cell(1, nSubTotal);
 %% Data structure
+[file,path] = uigetfile('*.mat', 'Select "DREAMS_SleepSpindles.mat" file');
+if isequal(file,0)
+   disp('Canceled by user');
+else
+    load(fullfile(path,file));
+end
+
+
+% Datapath = uigetdir(pwd, 'Select folder of "DREAMS_SleepSpindles.mat" file');
+% load([Datapath '/DREAMS_SleepSpindles.mat'])
 ySeq = cell(1, nSubTotal);
 labelsGT = cell(1, nSubTotal);
 for i = 1:nSubTotal
-    load(['Data/Subject' num2str(i) '_Fs' num2str(100) '.mat'])
-    ySeq{i} = y;
-    labelsGT{i} = labels;
-    
-    ySeq{i} = downsample(ySeq{i}, 2);
-    labelsGT{i} = downsample(labelsGT{i}, 2);
+    ySeq{i} = Y(i, :);
+    labelsGT{i} = ExpertLabels(i).VisualScoresUnion;
 end
+% ySeq = cell(1, nSubTotal);
+% labelsGT = cell(1, nSubTotal);
+% for i = 1:nSubTotal
+%     load(['Data/Subject' num2str(i) '_Fs' num2str(100) '.mat'])
+%     ySeq{i} = y;
+%     labelsGT{i} = labels;    
+%     ySeq{i} = downsample(ySeq{i}, 2);
+%     labelsGT{i} = downsample(labelsGT{i}, 2);
+% end
 %%
-HMModelIni.type = 'ARHSMMED';
-HMModelIni.Fs = Fs;
-HMModelIni.StateParameters.K = K;
-HMModelIni.normalize = normflag;
-HMModelIni.robustMstep = robustMstepflag;
-HMModelIni.ObsParameters.model = ObsModel;
-HMModelIni.ObsParameters.meanModel = 'Linear';
-HMModelIni.ARorder = p;
-HMModelIni.DurationParameters.dmax = dmax;
-HMModelIni.DurationParameters.dmin = dmin;
-HMModelIni.DurationParameters.model = 'NonParametric';
+ObsParameters.meanModel = 'Linear';
+DurationParameters.dmax = dmax;
+DurationParameters.dmin = dmin;
+DurationParameters.model = 'NonParametric';
 
 for subj_i = 1:nSubTotal
     testSet = subj_i;
     trainSet = setdiff(1:nSubTotal, testSet);
     fprintf('Test Subject %d, p = %d \n', testSet, p)
     
-%     HMModel = HMModelIni;
-%     for k = 1:numel(trainSet)
-%         TrainingStructure(k).y = ySeq{trainSet(k)};
-%         TrainingStructure(k).z = labelsGT{trainSet(k)};
-%     end
-%     HMModel = HMMLearningCompleteDataSleepSpindles(TrainingStructure, HMModel);
-    
-    % Initial Gaussian model
     yTrainSet = cell(1, numel(trainSet));
     for k = 1:numel(trainSet)
         yTrainSet{k} = ySeq{trainSet(k)};
     end
-    % Learn Gaussian model parameters via EM - NOTE: no observation
-    % parameter input so the default will be Gaussian
-    HMModel = HMMLearning(yTrainSet, K, 'type', HMModelIni.type,...
-        'ARorder', p, 'Estep', Estep, 'normalize', normflag,...
-        'DurationParameters', HMModelIni.DurationParameters,...
-        'robustMstep', false, 'Fs', Fs, 'SleepSpindles', true);
-    % Inference, i.e. segmentation via Viterbi
-    labelsTrainNormal = cell(1, numel(trainSet));
-    for k = 1:numel(trainSet)
-        [labelsPred, ~] = HMMInference(yTrainSet{k}, HMModel, 'normalize', normflag);
-        labelsPred(1:p) = 1;            % always non-spindles at the beginning
-        TrainingStructure(k).y = yTrainSet{k};
-        TrainingStructure(k).z = labelsPred;
-    end
-    % For debugging
-    HMModelNormal = HMModel;
-    % Pseudo ground truth with actual observation likelihood    
-%     for k = 1:numel(trainSet)
-%         TrainingStructure(k).y = yTrainSet{k};
-%         TrainingStructure(k).z = labelsTrainNormal{k};
-%     end
-    HMModel = HMModelIni;
-    HMModel.robustMstep = robustMstepflag;
-    HMModel = HMMLearningCompleteDataSleepSpindles(TrainingStructure, HMModel);
-    % Learn actual model
-    %DurationParameters.Ini = HMModel.DurationParameters.Ini;
-    HMModel = HMMLearning(yTrainSet, K, 'type', HMModelIni.type,...
-        'ARorder', p, 'Estep', Estep, 'normalize', normflag,...
-        'ObsParameters', HMModel.ObsParameters,...
-        'DurationParameters', HMModel.DurationParameters,...
-        'robustMstep', false, 'Fs', Fs, 'SleepSpindles', true);  
-    clear TrainingStructure y
+    HMModel = HMMLearning(yTrainSet, K,...
+        'ARorder', p, 'normalize', normflag,...
+        'ObsParameters', ObsParameters,...
+        'DurationParameters', DurationParameters,...
+        'robustIni', true, 'Fs', Fs, 'parallel', false);
     
-    % Test - finally
+    % Test
     ytest = ySeq{testSet};
     [labelsPred, ~] = HMMInference(ytest, HMModel, 'normalize', normflag);
-    [CM, CMevent] = ConfusionMatrixSpindles(labelsGT{testSet}(p+1:end), labelsPred(p+1:end), Fs);
-    TPR = CM(1,1)/sum(CM(1,:));     % recall
-    RE = TPR;
-    FPR = CM(2,1)/sum(CM(2,:));
-    PR = CM(1,1)/sum(CM(:,1));
-    FPProp = CM(2,1)/sum(CM(1,:));
-    F1 = 2*(RE*PR)/(RE + PR);
-    MCC = (CM(1,1)*CM(2,2)-CM(2,1)*CM(1,2))/...
-        sqrt((CM(1,1)+CM(1,2))*(CM(1,1)+CM(2,1))*(CM(2,2)+CM(2,1))*(CM(2,2)+CM(1,2)));
-    
-    
-    TPRalt = CMevent(1,1)/sum(CMevent(1,:));
-    FPRalt = CMevent(2,1)/sum(CMevent(2,:));
-    FPPropalt = CMevent(2,1)/sum(CMevent(1,:));
-    PerfTest(:, subj_i) = [F1 MCC FPProp]';
-    PerfTestAlt(:, subj_i) = [TPRalt FPRalt FPPropalt]';
+    [PerfTest(:, subj_i), PerfTestAlt(:, subj_i)] = PerfMeasures(labelsGT{testSet}(p+1:end), labelsPred(p+1:end), Fs);
     
     % Predictive log-likelihood
-    [loglike, ~, ~] = HMMLikelihood(ytest, HMModel, 'method', Estep, 'normalize', normflag);
+    loglike = HMMLikelihood(ytest, HMModel, 'normalize', normflag);
     NLLTest(subj_i) = -loglike;
     HMModelSupervised{subj_i} = HMModel;
 end
-%% Save results
-if robustMstepflag == true
-    save(['ICASSP results/Unsupervised/' ObsModel '/AR order ' num2str(p)...
-        '/Robust_dmax' num2str(dmaxSec) 'sec.mat'], 'PerfTest', 'PerfTestAlt', 'NLLTest', 'HMModelSupervised')
-else
-    save(['ICASSP results/Unsupervised/' ObsModel '/AR order ' num2str(p)...
-        '/NoRobust_dmax' num2str(dmaxSec) 'sec.mat'], 'PerfTest', 'PerfTestAlt', 'NLLTest', 'HMModelSupervised')
-end
+
+%% Display results
+fprintf('RESULTS: \n')
+T = array2table([PerfTest(1:2,:) mean(PerfTest(1:2,:),2)],...
+    'RowNames', {'F1', 'MCC'}, 'VariableNames',...
+    {'S1','S2','S3','S4','S5','S6','S7','S8','Average'});
+fprintf('F1 score and MCC between inference output and ground truth for supervised scheme \n \n')
+disp(T)
+fprintf('Average predictive negative log-likelihood: %d \n', round(mean(NLLTest)))
+fprintf('Event sensitivity: %.4f, event false positive rate: %.4f \n', mean(PerfTestAlt(1,:)), mean(PerfTestAlt(2,:)))

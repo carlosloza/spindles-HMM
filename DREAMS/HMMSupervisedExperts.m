@@ -41,26 +41,45 @@ PerfTestExpert = cell(2,2);
 PerfTestExpert(:) = {nan(3, nSubTotal)};
 
 %% Data structure
+%% Data structure
+Datapath = uigetdir(pwd, 'Select folder of "DREAMS_SleepSpindles.mat" file');
+load([Datapath '/DREAMS_SleepSpindles.mat'])
 ySeq = cell(1, nSubTotal);
 labelsGT = cell(1, nSubTotal);
 labelsGTExpert1 = cell(1, nSubTotal);
 labelsGTExpert2 = cell(1, nSubTotal);
 for i = 1:nSubTotal
-    load(['Data/Subject' num2str(i) '_Fs' num2str(100) '.mat'])
-    ySeq{i} = y;
-    labelsGT{i} = labels;
-    labelsGTExpert1{i} = labels1;
+    ySeq{i} = Y(i, :);
+    labelsGTExpert1{i} = ExpertLabels(i).Expert(1).VisualScores;
     if i <= 6
-        labelsGTExpert2{i} = labels2;
+        labelsGTExpert2{i} = ExpertLabels(i).Expert(2).VisualScores;
     end    
-    % Downsampling
-    ySeq{i} = downsample(ySeq{i}, 2);
-    labelsGT{i} = downsample(labelsGT{i}, 2);
-    labelsGTExpert1{i} = downsample(labelsGTExpert1{i}, 2);
-    if i <= 6
-        labelsGTExpert2{i} = downsample(labelsGTExpert2{i}, 2);
-    end
+    labelsGT{i} = ExpertLabels(i).VisualScoresUnion;
+    %ySeq{i} = downsample(ySeq{i}, 2);
+    %labelsGT{i} = downsample(labelsGT{i}, 2);
 end
+
+
+% ySeq = cell(1, nSubTotal);
+% labelsGT = cell(1, nSubTotal);
+% labelsGTExpert1 = cell(1, nSubTotal);
+% labelsGTExpert2 = cell(1, nSubTotal);
+% for i = 1:nSubTotal
+%     load(['Data/Subject' num2str(i) '_Fs' num2str(100) '.mat'])
+%     ySeq{i} = y;
+%     labelsGT{i} = labels;
+%     labelsGTExpert1{i} = labels1;
+%     if i <= 6
+%         labelsGTExpert2{i} = labels2;
+%     end    
+%     % Downsampling
+%     ySeq{i} = downsample(ySeq{i}, 2);
+%     labelsGT{i} = downsample(labelsGT{i}, 2);
+%     labelsGTExpert1{i} = downsample(labelsGTExpert1{i}, 2);
+%     if i <= 6
+%         labelsGTExpert2{i} = downsample(labelsGTExpert2{i}, 2);
+%     end
+% end
 
 %%
 HMModelIni.Fs = Fs;
