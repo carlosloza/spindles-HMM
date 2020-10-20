@@ -27,7 +27,7 @@ function HMModel = HMMLearning(ySeq, K, varargin)
 %                           (must be larger than ARorder)
 %                           - dmax: maximum duration (in samples) of regimes
 %   normalize :             logical value, default true
-%                           Flag to zscore input sequence
+%                           Flag to zscore input sequence(s)
 %                           Example: 'normalize', false
 %   robustIni :             logical value, default true
 %                           Flag to use robust linear regression (M-estimators)
@@ -39,13 +39,40 @@ function HMModel = HMMLearning(ySeq, K, varargin)
 %   parallel :              logical value, default true
 %                           Flag to use MATLAB parallel computing toolbox
 %                           Example, 'parallel', false
+%   Returns
+%   -------
+%   HMModel :               structure
+%                           Fields: 
+%                           - StateParameters: structure with number of
+%                           regimes (K), initial probabilities vector (pi),
+%                           state transition matrix (A)
+%                           - DurationParameters: structure with minimum 
+%                           (dmin) duration of regimes, maximum duration of 
+%                           regimes (duration in samples), and probability 
+%                           mass function of regime durations (non-parametric 
+%                           density)
+%                           - ObsParameters: structure with autoregressive
+%                           coefficients (meanParameters), scale, and
+%                           degrees of freedom of observation noise
+%                           - ARorder: autoregressive order
+%                           - loglike: log-likelihoods of training sequence(s) 
+%                           under RARHSMM during EM
+%                           - loglikeNorm: normalized log-likelihood of 
+%                           training sequence(s) under RARHSMM during EM
+%                           - robustIni: flag to use robust linear regression 
+%                           for initial estimate of AR coefficients (same as 
+%                           input to HMMLearning function)
+%                           - normalize: flag to zscore input sequence(s)
+%                           (same as input to HMMLearning function)
+%                           - Fs: sampling frequency in Hz
+%                           (same as input to HMMLearning function)
 %
 %Example: loglike = HMMLearning(y, 2)
 %Author: Carlos Loza (carlos.loza@utexas.edu)
 %https://github.com/carlosloza/spindles-HMM
 
 %% General parameters and settings
-HMModel.StateParameters.K = K;              % number of regimes/modes
+HMModel.StateParameters.K = K;              % Number of regimes/modes
 % Defaults
 HMModel.normalize = 1;
 HMModel.ARorder = 5;
@@ -93,7 +120,7 @@ HMModel.N = zeros(1, HMModel.nSeq);
 for i = 1:HMModel.nSeq
     y = ySeq{i};
     HMModel.N(i) = size(y, 2);
-    % Normalize each  training observation sequence 
+    % Normalize each training observation sequence 
     if HMModel.normalize
         y = zscore(y);
     end
@@ -119,30 +146,35 @@ for iSeq = 1:nSeq
     end
     HMModel.DelayARMatrix(iSeq).Seq = Ypaux;
 end
+
 %% Initial conditions - tuned for sleep spindle modeling for Fs=50 Hz
 HMModel = InitialConditionsSleepSpindles(ySeq, HMModel);
+
 %% Expectation-Maximization algorithm
 while fl
     % E STEP
     HMModel = ForwardBackward(ySeq, HMModel, parflag);
     HMModel = GeneralizedtEstep(ySeq, HMModel);
     % M STEP
-    HMModel = MaxEM(ySeq, HMModel);  
+    HMModel = MaxEM(ySeq, HMModel);    
     It = It + 1;
+    fprintf('Iteration: %d, log-likelihood: %.4f \n', It, HMModel.loglikeNorm(end))
     % Check for convergence
     if It > 1
         if abs(HMModel.loglikeNorm(It) - HMModel.loglikeNorm(It-1))/abs(HMModel.loglikeNorm(It - 1)) <= convTh          
             HMModel = cleanFields(HMModel, sortCell);    
+            fprintf('EM converged after %d iterations \n', It)
             break
         end
     end
     if It == maxIt
         HMModel = cleanFields(HMModel, sortCell); 
-        warning('Solution did not converge after %d iterations', maxIt)
+        warning('Solution did not converge after %d iterations \n', maxIt)
         break
     end        
 end
 end
+
 %% Forward-backward algorithm 
 % Logsumexp implementation for Explicit Duration Hidden Semi-Markov Model
 function HMModel = ForwardBackward(ySeq, HMModel, parflag)
@@ -157,7 +189,7 @@ K = HMModel.StateParameters.K;          % number of regimes/modes
 iIni = HMModel.ARorder + 1;             % initial time sample for alpha-beta algorithm
 dmax = HMModel.DurationParameters.dmax; % maximum duration (in samples) of regimes
 % Work in log domain
-Atrans = HMModel.StateParameters.A(:, :, 1);
+Atrans = HMModel.StateParameters.A;
 logAtrans = log(Atrans);
 logAtransT = logAtrans';
 loglikeSeq = zeros(1, nSeq);            % log-likelihood per input sequence
@@ -304,6 +336,7 @@ end
 HMModel.loglike = [HMModel.loglike sum(loglikeSeq)];    % add all log-likelihoods
 HMModel.loglikeNorm = [HMModel.loglikeNorm sum(loglikeSeq./HMModel.N)]; % add all normalized log-likelihoods (key when input sequences have different lengths)
 end
+
 %% Expectations of latent variables from observation model
 % eq (12) in paper
 function HMModel = GeneralizedtEstep(ySeq, HMModel)
@@ -325,12 +358,9 @@ for iSeq = 1:nSeq
     HMModel.EM(iSeq).Etau = single(wnk);
 end
 end
+
 %% Simple function to clean EM fields after convergence
 function HMModel = cleanFields(HMModel, sortCell)
-HMModel = rmfield(HMModel, {'N'; 'nSeq'; 'EM'});
-aux = rmfield(HMModel.DurationParameters, 'flag');
-HMModel = rmfield(HMModel, 'DurationParameters');
-HMModel.DurationParameters = aux;
-HMModel = rmfield(HMModel, 'DelayARMatrix');
+HMModel = rmfield(HMModel, {'N'; 'nSeq'; 'EM'; 'DelayARMatrix'});
 HMModel = orderfields(HMModel, sortCell);
 end

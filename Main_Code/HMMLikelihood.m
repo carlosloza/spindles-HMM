@@ -30,6 +30,7 @@ function [loglike, alphaEM, auxEM] = HMMLikelihood(y, HMModel, varargin)
 %                   - logpDZ, marginal log-likelihoods of durations
 %
 %Example: loglike = HMMLikelihood(y, HMModel)
+%Note: Requires Statistics and Machine Learning Toolbox 
 %Author: Carlos Loza (carlos.loza@utexas.edu)
 %https://github.com/carlosloza/spindles-HMM
 
@@ -68,7 +69,8 @@ if ~isfield(HMModel, 'DelayARMatrix')
 end
 % Conditional and marginal log-likelihoods to be used later
 logpYZ = LogProbObsGivenZ(y, HMModel);
-logpDZ = log(HMModel.DurationParameters.PNonParametric);
+logpDZ = log(HMModel.DurationParameters.PNonParametric);        % eq (2) in paper
+
 %% Forward sum-product algorithm - eq (7) in paper
 % Forward pass of message passing (sum-product algorithm)
 % Two implementations are needed: 
@@ -81,7 +83,7 @@ nforw = iIni+1:N;
 auxEM.logpYZ = logpYZ;
 auxEM.logpDZ = logpDZ;
 logpzIni = log(HMModel.StateParameters.pi);
-Atrans = HMModel.StateParameters.A(:, :, 1);
+Atrans = HMModel.StateParameters.A;
 logAtrans = log(Atrans);
 if alphaflag
     alphaEM = cell(1, N);    % inside each cell element: states x durations

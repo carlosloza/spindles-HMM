@@ -24,6 +24,7 @@ function [z, loglike, drem] = HMMInference(y, HMModel, varargin)
 %                   Mainly used for debugging
 %
 %Example: z = HMMInference(y, HMModel)
+%Note: Requires Statistics and Machine Learning Toolbox 
 %Author: Carlos Loza (carlos.loza@utexas.edu)
 %https://github.com/carlosloza/spindles-HMM
 
@@ -33,10 +34,6 @@ N = size(y, 2);                         % number of time samples in y
 iIni = HMModel.ARorder + 1;             % initial time sample for estimation
 dmax = HMModel.DurationParameters.dmax; % maximum duration of regimes (D in paper)
 pmin = 2e-300;                          % To avoid underflow
-% For compatibility
-if ~isfield(HMModel.DurationParameters, 'flag')
-    HMModel.DurationParameters.flag = 0;
-end
 % Defaults
 normflag = true;
 % Check inputs
@@ -57,12 +54,12 @@ end
 HMModel.DelayARMatrix = Yp;
 % Conditional and marginal log-likelihoods to be used later
 logpYZ = LogProbObsGivenZ(y, HMModel);
-logpDZ = log(HMModel.DurationParameters.PNonParametric);
+logpDZ = log(HMModel.DurationParameters.PNonParametric);    % eq (2) in paper
 % Work in log domain
 pzIni = double(HMModel.StateParameters.pi);
 pzIni(pzIni < pmin) = pmin;
 logpzIni = log(pzIni);
-Atrans = HMModel.StateParameters.A(:, :, 1);
+Atrans = HMModel.StateParameters.A;
 Atrans(Atrans < pmin) = pmin;
 logAtrans = log(Atrans);
 %% Viterbi decoding (extended to handle bivariate hidden states)

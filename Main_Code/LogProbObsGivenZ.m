@@ -29,6 +29,6 @@ for k = 1:K
         HMModel.ObsParameters.meanParameters(k).Coefficients)';     % linear generalized t mean
     sigk = HMModel.ObsParameters.sigma(k);                          % scale parameters
     nuk = HMModel.ObsParameters.nu(k);                              % degrees of freedom
-    logpYZ(k, iIni:end) = log(pdf('tLocationScale', y(iIni:end) - muk, 0, sigk, nuk));  % observation conditional likelihoods/probabilities
+    logpYZ(k, iIni:end) = log(pdf('tLocationScale', y(iIni:end) - muk, 0, sigk, nuk));  % observation conditional likelihoods/probabilities, eq (5) in paper
 end
 end
